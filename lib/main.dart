@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+//inclur as bibliotecas
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:tflite/tflite.dart';
+bool visualizar=false;
 
 void main() {
   runApp(const MyApp());
@@ -48,18 +53,38 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  late PickedFile _image;
+  late String _classification;
+  final picker = ImagePicker();
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  void _getImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    visualizar=false;
+    if (pickedFile != null) {
+      setState(() {
+        _image = PickedFile(pickedFile.path);
+        visualizar=true;
+      });
+    }
   }
+
+  void _processImage() async {
+    String? res = await Tflite.loadModel(
+        model: "assets/fruits.tflite", labels: "assets/labels.txt");
+
+    var output = await Tflite.runModelOnImage(
+      path: _image.path,
+      numResults: 1,
+      threshold: 0.05,
+      imageMean: 0.0,
+      imageStd: 255.0,
+    );
+
+    setState(() {
+      _classification = output?[0]["label"] ?? "Unable to classify";
+    });
+    }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -95,21 +120,31 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+            if (visualizar == true)
+            _image == null
+                ? Text("No image selected.")
+                : Image.file(File(_image.path)),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _getImage,
+              child: Text("Select Image"),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _processImage,
+              child: Text("Process"),
             ),
+            SizedBox(height: 20),
+            if (visualizar == true)
+             _classification == null? Text("")
+                : Text(
+                    "Classification: $_classification",
+                    style: TextStyle(fontSize: 18),
+                  ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+       // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
